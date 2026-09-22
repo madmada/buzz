@@ -298,6 +298,12 @@ impl LockedMemberSnapshot {
         }
         crate::insert_mentions_in_transaction(&mut self.tx, community_id, event, Some(channel_id))
             .await?;
+        crate::operator_listener::enqueue_mentions_in_transaction(
+            &mut self.tx,
+            community_id,
+            event,
+        )
+        .await?;
         Ok((
             buzz_core::StoredEvent::with_received_at(
                 event.clone(),

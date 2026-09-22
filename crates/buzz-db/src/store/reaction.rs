@@ -227,6 +227,15 @@ pub async fn insert_reaction_event_with_thread_metadata(
     )
     .await?;
 
+    if was_inserted {
+        crate::operator_listener::enqueue_mentions_in_transaction(
+            &mut tx,
+            community_id,
+            reaction_event,
+        )
+        .await?;
+    }
+
     tx.commit().await?;
 
     Ok(ReactionEventInsertOutcome::Inserted {

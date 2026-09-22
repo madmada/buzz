@@ -21,10 +21,9 @@ use buzz_core::{CommunityId, StoredEvent};
 
 /// Extract p-tag mentions from an event and insert into the `event_mentions` table.
 ///
-/// This pool-owning wrapper propagates failures to its caller. Replacement writes
-/// use the transaction-bound helper below so event storage and mention indexing
-/// commit or roll back together. Duplicate inserts are silently skipped with
-/// `INSERT ... ON CONFLICT DO NOTHING`.
+/// This pool-owning wrapper propagates failures to its caller. Event ingestion
+/// calls this after committing the event and treats failures as best effort.
+/// Duplicate inserts are silently skipped with `INSERT ... ON CONFLICT DO NOTHING`.
 pub async fn insert_mentions(
     pool: &PgPool,
     community_id: CommunityId,
@@ -1258,6 +1257,10 @@ impl Db {
             None,
         )
         .await?;
+        if result.1 {
+            crate::operator_listener::enqueue_mentions_in_transaction(&mut tx, community_id, event)
+                .await?;
+        }
         tx.commit().await?;
         if result.1 {
             if let Err(e) = insert_mentions(&self.pool, community_id, event, channel_id).await {

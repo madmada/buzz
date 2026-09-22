@@ -352,6 +352,8 @@ async fn replace_parameterized_event_in_transaction_impl(
     }
 
     crate::insert_mentions_in_transaction(&mut savepoint, community_id, event, channel_id).await?;
+    crate::operator_listener::enqueue_mentions_in_transaction(&mut savepoint, community_id, event)
+        .await?;
     savepoint.commit().await?;
 
     Ok(ParameterizedReplaceResult::new(
@@ -508,6 +510,8 @@ impl Db {
                 // authoritative discovery write. An indexing error must roll back the
                 // new event and restore the previously-live event.
                 crate::insert_mentions_in_transaction(&mut tx, community_id, event, channel_id)
+                    .await?;
+                crate::operator_listener::enqueue_mentions_in_transaction(&mut tx, community_id, event)
                     .await?;
 
                 tx.commit().await?;
